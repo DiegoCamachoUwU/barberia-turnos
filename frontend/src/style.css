@@ -1,0 +1,69 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600;1,700&display=swap");
+
+:root {
+  font-family: "DM Sans", sans-serif;
+  color: #24211d;
+  background: #f5f2ec;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  font-smooth: always;
+  font-weight: 400;
+  --ink: #24211d;
+  --muted: #827c72;
+  --accent: #bd7844;
+  --line: #e8e2d9;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; }
+button, input, select { font: inherit; }
+.shell { max-width: 1120px; margin: 0 auto; padding: 0 42px; }
+.topbar { height: 82px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); }
+.brand { color: var(--ink); text-decoration: none; font-size: 19px; font-weight: 700; letter-spacing: .12em; }
+.brand span { color: var(--accent); }
+.tagline, .eyebrow, footer { font-size: 10px; font-weight: 700; letter-spacing: .16em; color: var(--muted); }
+.hero { position: relative; display: flex; align-items: center; justify-content: space-between; min-height: 330px; padding: 38px 0 45px; }
+.eyebrow { color: var(--accent); margin: 0 0 16px; }
+h1 { margin: 0; font: 600 clamp(48px, 7vw, 76px)/.98 "Playfair Display", serif; letter-spacing: -.045em; }
+h1 em { color: var(--accent); }
+.intro { max-width: 370px; color: var(--muted); font-size: 14px; line-height: 1.7; margin: 18px 0 0; }
+.hero-mark { color: #dfc7ad; font-size: 160px; line-height: 1; padding-right: 45px; }
+.content-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+.panel { background: #fffdfa; border: 1px solid var(--line); padding: 28px; }
+.section-heading { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 24px; }
+.step { color: var(--accent); font: italic 600 14px "Playfair Display", serif; padding-top: 3px; }
+h2 { font: 600 22px "Playfair Display", serif; margin: 0 0 5px; }
+.section-heading p { color: var(--muted); font-size: 12px; margin: 0; }
+label { display: block; color: #6f695f; font-size: 11px; font-weight: 600; margin-bottom: 16px; }
+input, select { width: 100%; height: 43px; margin-top: 7px; padding: 0 12px; color: var(--ink); background: #fff; border: 1px solid var(--line); border-radius: 2px; outline: none; font-size: 13px; }
+input:focus, select:focus { border-color: var(--accent); }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+button { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; color: #fff; background: var(--ink); border: 0; cursor: pointer; font-size: 12px; font-weight: 600; }
+button:hover { background: #44382f; }
+button span { font-size: 17px; color: #e2a878; }
+.message { color: var(--accent); font-size: 12px; line-height: 1.5; margin: 12px 0 0; }
+.agenda > label { max-width: 210px; }
+.empty { padding: 32px 0; color: var(--muted); font-size: 13px; text-align: center; }
+.appointment-list { padding: 0; margin: 12px 0 0; list-style: none; }
+.appointment-list li { display: flex; align-items: center; gap: 12px; padding: 14px 0; border-top: 1px solid var(--line); }
+.appointment-list time { width: 52px; color: var(--accent); font: 600 15px "Playfair Display", serif; }
+.appointment-list li div { display: grid; gap: 4px; flex: 1; }
+.appointment-list strong { font-size: 12px; }
+.appointment-list li div span { color: var(--muted); font-size: 11px; }
+.status { color: #74694f; font-size: 9px; white-space: nowrap; }
+.status.confirmed { color: #43835d; }
+.status.cancelled { color: #a55043; }
+footer { text-align: center; padding: 38px 0; color: #aaa297; }
+
+@media (max-width: 760px) {
+  .shell { padding: 0 20px; }
+  .hero { min-height: 290px; }
+  .hero-mark { padding-right: 0; font-size: 100px; }
+  .content-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 480px) {
+  .tagline { font-size: 8px; }
+  .hero-mark { display: none; }
+  .panel { padding: 22px 18px; }
+  .form-row { grid-template-columns: 1fr; gap: 0; }
+}
