@@ -434,6 +434,8 @@ function App() {
             </ul>
           )}
         </section>
+        </section>
+        )}
         </>
       )}
       <footer>BUEN CORTE. BUEN DÍA.</footer>

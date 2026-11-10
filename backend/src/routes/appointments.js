@@ -13,6 +13,7 @@ import {
 } from "../services/schedule.js";
 import {
   sendAppointmentConfirmation,
+  sendBarberNotification,
   buildCalendarEvent,
   notificationSelection
 } from "../services/notifications.js";
@@ -233,7 +234,7 @@ appointmentsRouter.post("/", async (req, res, next) => {
   }
 
   try {
-    const appointment = await prisma.$transaction(async (transaction) => {
+    const { appointment, barber } = await prisma.$transaction(async (transaction) => {
       const organization = req.organization;
       const [barber, service] = await Promise.all([
         transaction.barber.findFirst({
@@ -295,7 +296,7 @@ appointmentsRouter.post("/", async (req, res, next) => {
         throw error;
       }
 
-      return transaction.appointment.create({
+      const createdAppointment = await transaction.appointment.create({
         data: {
           clientName: clientName.trim(),
           clientPhone: clientPhone.trim(),
@@ -308,12 +309,19 @@ appointmentsRouter.post("/", async (req, res, next) => {
         },
         select: appointmentSelection
       });
+      return { appointment: createdAppointment, barber };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
     const notification = await sendAppointmentConfirmation({
       appointment,
       organization: req.organization,
       barber: appointment.barber,
+      service: appointment.service
+    });
+    const barberNotification = await sendBarberNotification({
+      appointment,
+      organization: req.organization,
+      barber,
       service: appointment.service
     });
 
@@ -324,7 +332,8 @@ appointmentsRouter.post("/", async (req, res, next) => {
         channel: notification.channel,
         sent: notification.sent,
         provider: notification.provider,
-        error: notification.error
+        error: notification.error,
+        barber: { sent: barberNotification?.sent ?? false }
       }
     });
   } catch (error) {

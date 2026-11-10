@@ -52,11 +52,13 @@ Se requiere una cuenta en GitHub, Render, Supabase y Vercel. Sube este proyecto 
    - `ADMIN_PASSWORD`: contraseña fuerte de al menos 12 caracteres.
    - `JWT_SECRET`: Render lo genera automáticamente si no lo defines.
 4. Define las variables de notificaciones post-reserva (Frente 1) según el canal que uses:
-   - `NOTIFICATION_CHANNEL`: `whatsapp` o `email` (deja `none` si no usas notificaciones aún).
+   - `NOTIFICATION_CHANNEL`: establece `whatsapp` para enviar la confirmación al cliente y el aviso al barbero (deja `none` si no quieres enviar WhatsApp).
    - `APP_BASE_URL`: URL pública de la API, por ejemplo `https://barberia-turnos-api.onrender.com/api/v1`.
    - Si usas **Twilio**: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER`.
    - Si usas **Evolution API**: `EVOLUTION_API_URL`, `EVOLUTION_API_INSTANCE`, `EVOLUTION_API_TOKEN`.
    - Si usas **Resend (email)**: `RESEND_API_KEY`, `RESEND_FROM_EMAIL`.
+   - En el panel Admin > Equipo, guarda el número WhatsApp de cada barbero en formato internacional E.164, por ejemplo `+573001234567`. El número se mantiene privado y solo lo usa el backend para enviar el aviso al barbero asignado.
+   - El aviso de WhatsApp al barbero incluye enlaces para agregar el turno a Google Calendar o descargar un archivo `.ics`. Configura `APP_BASE_URL` con la URL pública base de la API, incluyendo `/api/v1`, para que el enlace del calendario abra desde internet.
 5. Render ejecuta automáticamente `npm run db:migrate:deploy` y `npm run db:seed` al iniciar, creando el esquema y el administrador inicial de `ADMIN_EMAIL`.
 6. Cuando termine el despliegue, comprueba `https://<URL-DE-LA-API>/api/v1/health`. Debe responder `{"status":"ok"}`.
 
@@ -92,7 +94,7 @@ Después del despliegue inicial, valida que todo funcione:
 3. **Disponibilidad:** `GET /api/v1/barberia-principal/turnos/disponibles?barberId=<id>&serviceId=<id>&date=YYYY-MM-DD` debe devolver slots.
 4. **Reserva:** desde el frontend en Vercel, reserva un turno y verifica que se cree correctamente.
 5. **Administración:** inicia sesión con `ADMIN_EMAIL` y `ADMIN_PASSWORD` en **Agenda del día** y confirma que puedes cambiar estados de turno.
-6. **Notificaciones:** si configuraste `NOTIFICATION_CHANNEL`, reserva un turno con correo o teléfono y verifica que llegue la confirmación (WhatsApp o Email).
+6. **Notificaciones:** si configuraste `NOTIFICATION_CHANNEL=whatsapp`, las credenciales de Twilio/Evolution y el WhatsApp del barbero, reserva un turno y verifica que se envíen la confirmación al cliente y el aviso al barbero asignado. Un fallo del proveedor no cancela la reserva.
 
 La URL de Vercel debe coincidir exactamente con `CLIENT_ORIGIN`; si cambia el dominio de producción, actualiza esa variable en Render y redespliega.
 

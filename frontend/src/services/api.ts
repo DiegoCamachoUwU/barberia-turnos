@@ -8,6 +8,7 @@ import type {
   NotificationResult,
   Organization,
   OnboardingResult,
+  Shop,
   Service,
   ServiceAdmin,
   TimeOffAdmin
@@ -128,7 +129,7 @@ export const registerBarbershop = (data: {
     body: JSON.stringify(data)
   });
 
-// ---------- Administración self-service del negocio ----------
+// ---------- Administraciï¿½n self-service del negocio ----------
 
 export const updateOrganization = (slug: string, data: {
   name?: string;
@@ -182,7 +183,10 @@ export const getBarbersAdmin = (slug: string, token: string) =>
     headers: { Authorization: `Bearer ${token}` }
   });
 
-export const createBarber = (slug: string, token: string, data: { name: string }) =>
+export const createBarber = (slug: string, token: string, data: {
+  name: string;
+  whatsappPhone?: string | null;
+}) =>
   request<BarberAdmin>(`/${encodeURIComponent(slug)}/admin/barberos`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
@@ -191,6 +195,7 @@ export const createBarber = (slug: string, token: string, data: { name: string }
 
 export const updateBarber = (slug: string, token: string, id: string, data: {
   name?: string;
+  whatsappPhone?: string | null;
   active?: boolean;
 }) =>
   request<BarberAdmin>(`/${encodeURIComponent(slug)}/admin/barberos/${encodeURIComponent(id)}`, {

@@ -40,6 +40,7 @@ export default function AdminPanel({ slug, token }: { slug: string; token: strin
   const [editingSvcId, setEditingSvcId] = useState<string | null>(null);
 
   const [barberName, setBarberName] = useState("");
+  const [barberWhatsappPhone, setBarberWhatsappPhone] = useState("");
   const [editingBarberId, setEditingBarberId] = useState<string | null>(null);
 
   const [toBarberId, setToBarberId] = useState("");
@@ -150,12 +151,19 @@ export default function AdminPanel({ slug, token }: { slug: string; token: strin
     setError("");
     try {
       if (editingBarberId) {
-        await updateBarber(slug, token, editingBarberId, { name: barberName });
+        await updateBarber(slug, token, editingBarberId, {
+          name: barberName,
+          whatsappPhone: barberWhatsappPhone || null
+        });
         setEditingBarberId(null);
       } else {
-        await createBarber(slug, token, { name: barberName });
+        await createBarber(slug, token, {
+          name: barberName,
+          whatsappPhone: barberWhatsappPhone || null
+        });
       }
       setBarberName("");
+      setBarberWhatsappPhone("");
       await loadData();
       setMessage("Barbero guardado.");
     } catch (err) {
@@ -282,11 +290,12 @@ export default function AdminPanel({ slug, token }: { slug: string; token: strin
         <>
           <form className="barber-form" onSubmit={handleBarberSubmit}>
             <label>Nombre del barbero<input required value={barberName} onChange={(e) => setBarberName(e.target.value)} placeholder="Ej. Andrés" /></label>
+            <label>WhatsApp del barbero<input type="tel" value={barberWhatsappPhone} onChange={(e) => setBarberWhatsappPhone(e.target.value)} placeholder="+573001234567" /></label>
             <button type="submit">{editingBarberId ? "Actualizar barbero" : "Agregar barbero"}</button>
-            {editingBarberId && <button type="button" onClick={() => setEditingBarberId(null)}">Cancelar</button>}
+            {editingBarberId && <button type="button" onClick={() => { setEditingBarberId(null); setBarberName(""); setBarberWhatsappPhone(""); }}>Cancelar</button>}
           </form>
           <table className="list-table">
-            <thead><tr><th>Barbero</th><th>Estado</th><th>Acciones</th></tr></thead>
+            <thead><tr><th>Barbero</th><th>WhatsApp</th><th>Estado</th><th>Acciones</th></tr></thead>
             <tbody>
               {barbers.map((b) => (
                 <tr key={b.id}>
@@ -297,6 +306,7 @@ export default function AdminPanel({ slug, token }: { slug: string; token: strin
                       b.name
                     )}
                   </td>
+                  <td>{b.whatsappPhone || "No configurado"}</td>
                   <td>
                     <label>
                       <input type="checkbox" checked={b.active} onChange={() => void handleToggleBarber(b.id, !b.active)} />
@@ -306,7 +316,7 @@ export default function AdminPanel({ slug, token }: { slug: string; token: strin
                   <td className="actions">
                     {editingBarberId !== b.id ? (
                       <>
-                        <button type="button" onClick={() => { setBarberName(b.name); setEditingBarberId(b.id); }}>Editar</button>
+                        <button type="button" onClick={() => { setBarberName(b.name); setBarberWhatsappPhone(b.whatsappPhone || ""); setEditingBarberId(b.id); }}>Editar</button>
                         <button type="button" onClick={() => void handleToggleBarber(b.id, false)}>Desactivar</button>
                       </>
                     ) : (
@@ -342,7 +352,7 @@ export default function AdminPanel({ slug, token }: { slug: string; token: strin
                   <td>{formatLocal(t.endsAt)}</td>
                   <td>{t.reason || "—"}</td>
                   <td className="actions">
-                    <button type="button" onClick={() => void deleteTimeOff(slug, token, t.id).then(() => { setMessage(""); void loadData(); })">Eliminar</button>
+                    <button type="button" onClick={() => void deleteTimeOff(slug, token, t.id).then(() => { setMessage(""); void loadData(); })}>Eliminar</button>
                   </td>
                 </tr>
               ))}

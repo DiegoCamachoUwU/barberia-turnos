@@ -1,10 +1,13 @@
 import { Prisma } from "@prisma/client";
 
-const APP_BASE_URL = process.env.APP_BASE_URL || "http://localhost:5173";
+const APP_BASE_URL = process.env.APP_BASE_URL || "http://localhost:3000/api/v1";
 
 function calendarPath(slug, appointmentId) {
-  const base = APP_BASE_URL.replace(/\/$/, "");
-  return `${base}/api/v1/${encodeURIComponent(slug)}/turnos/${encodeURIComponent(appointmentId)}/calendar.ics`;
+  const base = `${APP_BASE_URL.replace(/\/+$/, "")}/`;
+  return new URL(
+    `${encodeURIComponent(slug)}/turnos/${encodeURIComponent(appointmentId)}/calendar.ics`,
+    base
+  ).toString();
 }
 
 export const NOTIFICATION_CHANNELS = ["whatsapp", "email", "none"];
@@ -214,6 +217,34 @@ function confirmationMessage({ appointment, organization, barber, service, calen
   ].join("\n");
 }
 
+export function barberNotificationMessage({
+  appointment,
+  organization,
+  barber,
+  service,
+  calendar = buildCalendarLinks({ appointment, organization, barber, service })
+}) {
+  const startsAt = new Date(appointment.startsAt).toLocaleString("es-CO", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: organization.timezone
+  });
+  return [
+    `💈 ¡Nuevo turno agendado en ${organization.name}!`,
+    `Cliente: ${appointment.clientName}`,
+    `Teléfono: ${appointment.clientPhone}`,
+    `Servicio: ${service.name}`,
+    `Fecha y hora: ${startsAt}`,
+    `Barbero: ${barber.name}`,
+    `Agregar a Google Calendar: ${calendar.googleCalendar}`,
+    `Descargar calendario (.ics): ${calendar.ics}`
+  ].join("\n");
+}
+
 function confirmationHtml({ appointment, organization, barber, service, calendar }) {
   const start = new Date(appointment.startsAt).toLocaleString("es-CO", {
     weekday: "long",
@@ -327,7 +358,49 @@ export async function sendAppointmentConfirmation({
   }
 }
 
+export async function sendBarberNotification({
+  appointment,
+  organization,
+  barber,
+  service
+}) {
+  const channel = resolveNotificationChannel();
+  const whatsappConfigured = Boolean(
+    process.env.TWILIO_ACCOUNT_SID &&
+      process.env.TWILIO_AUTH_TOKEN &&
+      process.env.TWILIO_FROM_NUMBER
+  ) || Boolean(
+    process.env.EVOLUTION_API_URL &&
+      process.env.EVOLUTION_API_INSTANCE &&
+      process.env.EVOLUTION_API_TOKEN
+  );
+  if (channel !== "whatsapp" || !whatsappConfigured) return null;
+
+  const to = barber.whatsappPhone;
+  if (!to) return { sent: false, provider: null, error: "El barbero no tiene número de WhatsApp disponible" };
+
+  try {
+    const body = barberNotificationMessage({ appointment, organization, barber, service });
+    if (
+      process.env.TWILIO_ACCOUNT_SID &&
+      process.env.TWILIO_AUTH_TOKEN &&
+      process.env.TWILIO_FROM_NUMBER
+    ) {
+      await sendWhatsAppTwilio(to, body);
+      return { sent: true, provider: "twilio", error: null };
+    }
+    await sendWhatsAppEvolution(to, body);
+    return { sent: true, provider: "evolution", error: null };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("[notifications] No se pudo enviar la notificación al barbero:", message);
+    return { sent: false, provider: null, error: message };
+  }
+}
+
 export const notificationSelection = {
+  id: true,
+  organizationId: true,
   clientName: true,
   clientPhone: true,
   clientEmail: true,

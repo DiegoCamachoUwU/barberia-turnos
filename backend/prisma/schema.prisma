@@ -71,6 +71,7 @@ model Service {
 model Barber {
   id             String              @id @default(cuid())
   name           String
+  whatsappPhone  String?
   active         Boolean             @default(true)
   organizationId String
   organization   Organization        @relation(fields: [organizationId], references: [id])

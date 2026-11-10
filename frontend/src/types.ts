@@ -15,6 +15,8 @@ export interface Shop {
   name: string;
   slug: string;
   timezone: string;
+  phone?: string | null;
+  address?: string | null;
 }
 
 export interface AvailableSlot {
@@ -50,6 +52,7 @@ export interface NotificationResult {
   sent: boolean;
   provider: string | null;
   error: string | null;
+  barber?: { sent: boolean };
 }
 
 export interface AppointmentConfirmation extends Omit<Appointment, "clientEmail"> {
@@ -85,6 +88,7 @@ export interface ServiceAdmin {
 export interface BarberAdmin {
   id: string;
   name: string;
+  whatsappPhone: string | null;
   active: boolean;
   organizationId: string;
   createdAt: string;

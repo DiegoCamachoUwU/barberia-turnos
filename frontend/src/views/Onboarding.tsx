@@ -89,9 +89,6 @@ export default function Onboarding({ onComplete }: { onComplete: (slug: string) 
         <label>Teléfono del administrador (opcional)<input name="adminPhone" type="tel" autoComplete="tel" value={adminPhone} onChange={(e) => setAdminPhone(e.target.value)} placeholder="Ej. 300 987 6543" /></label>
         <button type="submit" disabled={loading}>{loading ? "Registrando…" : "Registrar barbería"}</button>
       </form>
-      {success && (
-        <p className="message success" role="status">{`¡Listo! Accede a tu negocio en /${success.organization.slug}`}</p>
-      )}
     </section>
   );
 }

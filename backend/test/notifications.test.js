@@ -3,6 +3,8 @@ import test from "node:test";
 import {
   resolveNotificationChannel,
   isNotificationConfigured,
+  barberNotificationMessage,
+  sendBarberNotification,
   buildCalendarEvent,
   buildGoogleCalendarUrl,
   buildCalendarLinks
@@ -127,6 +129,74 @@ test("buildGoogleCalendarUrl returns a Google Calendar link", () => {
 
 test("buildCalendarLinks returns ics and googleCalendar", () => {
   const links = buildCalendarLinks({ appointment, organization, barber, service });
-  assert.ok(links.ics.includes("/api/v1/barberia-principal/turnos/appt-1/calendar.ics"));
+  assert.equal(
+    links.ics,
+    "http://localhost:3000/api/v1/barberia-principal/turnos/appt-1/calendar.ics"
+  );
   assert.ok(links.googleCalendar.startsWith("https://calendar.google.com/"));
+});
+
+test("barberNotificationMessage includes the booking details in the shop timezone", () => {
+  const message = barberNotificationMessage({
+    appointment,
+    organization,
+    barber,
+    service
+  });
+
+  assert.ok(message.includes("¡Nuevo turno agendado en Barbería principal!"));
+  assert.ok(message.includes("Cliente: Diego Pérez"));
+  assert.ok(message.includes("Teléfono: +573001234567"));
+  assert.ok(message.includes("Servicio: Corte"));
+  assert.ok(message.includes("Barbero: Andrés"));
+  assert.ok(message.includes("miércoles, 11 de noviembre de 2026"));
+  assert.ok(message.includes("Agregar a Google Calendar: https://calendar.google.com/calendar/render?"));
+  assert.ok(message.includes("Descargar calendario (.ics): http://localhost:3000/api/v1/barberia-principal/turnos/appt-1/calendar.ics"));
+});
+
+test("sendBarberNotification sends WhatsApp to the assigned barber", async () => {
+  const envKeys = [
+    "NOTIFICATION_CHANNEL",
+    "TWILIO_ACCOUNT_SID",
+    "TWILIO_AUTH_TOKEN",
+    "TWILIO_FROM_NUMBER"
+  ];
+  const previousEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
+  const originalFetch = globalThis.fetch;
+  let requestUrl;
+  let requestBody;
+  Object.assign(process.env, {
+    NOTIFICATION_CHANNEL: "whatsapp",
+    TWILIO_ACCOUNT_SID: "test-account",
+    TWILIO_AUTH_TOKEN: "test-token",
+    TWILIO_FROM_NUMBER: "whatsapp:+14155238886"
+  });
+  globalThis.fetch = async (url, options) => {
+    requestUrl = url;
+    requestBody = options.body;
+    return new Response('{"sid":"SM123"}', {
+      status: 201,
+      headers: { "Content-Type": "application/json" }
+    });
+  };
+
+  try {
+    const result = await sendBarberNotification({
+      appointment,
+      organization,
+      barber: { ...barber, whatsappPhone: "+573001112233" },
+      service
+    });
+
+    assert.deepEqual(result, { sent: true, provider: "twilio", error: null });
+    assert.ok(requestUrl.includes("/Messages.json"));
+    assert.ok(requestBody.get("To") === "whatsapp:+573001112233");
+    assert.ok(requestBody.get("Body").includes("Diego Pérez"));
+  } finally {
+    globalThis.fetch = originalFetch;
+    for (const [key, value] of Object.entries(previousEnv)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
 });

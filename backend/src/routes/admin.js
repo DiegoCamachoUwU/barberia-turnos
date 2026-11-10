@@ -102,7 +102,7 @@ adminRouter.post("/servicios", ...requireAdminSelfService, async (req, res, next
   if (description !== undefined) data.description = description.trim() ? description.trim() : null;
   if (durationMins !== undefined) {
     if (typeof durationMins !== "number" || durationMins <= 0) {
-      return res.status(400).json({ error: "La duración debe ser mayor a cero." });
+      return res.status(400).json({ error: "La duraciï¿½n debe ser mayor a cero." });
     }
     data.durationMins = durationMins;
   }
@@ -134,7 +134,7 @@ adminRouter.post("/servicios", ...requireAdminSelfService, async (req, res, next
       return res.status(404).json({ error: "Servicio no encontrado." });
     }
     if (error.code === "P2002") {
-      return res.status(409).json({ error: "Ya existe un servicio con ese nombre en esta barbería." });
+      return res.status(409).json({ error: "Ya existe un servicio con ese nombre en esta barberï¿½a." });
     }
     next(error);
   }
@@ -156,7 +156,14 @@ adminRouter.delete("/servicios/:id", ...requireAdminSelfService, async (req, res
 });
 // ---------- Barberos (equipo) ----------
 
-adminRouter.get("/barberos", ...requireAdminSelfService, async (_req, res, next) => {
+function normalizeWhatsappPhone(value) {
+  if (value === undefined || value === null || value === "") return null;
+  if (typeof value !== "string") return undefined;
+  const normalized = value.replace(/[\s()-]/g, "");
+  return /^\+[1-9]\d{7,14}$/.test(normalized) ? normalized : undefined;
+}
+
+adminRouter.get("/barberos", ...requireAdminSelfService, async (req, res, next) => {
   try {
     const barbers = await prisma.barber.findMany({
       where: { organizationId: req.organization.id },
@@ -164,6 +171,7 @@ adminRouter.get("/barberos", ...requireAdminSelfService, async (_req, res, next)
       select: {
         id: true,
         name: true,
+        whatsappPhone: true,
         active: true,
         createdAt: true,
         updatedAt: true
@@ -176,16 +184,21 @@ adminRouter.get("/barberos", ...requireAdminSelfService, async (_req, res, next)
 });
 
 adminRouter.post("/barberos", ...requireAdminSelfService, async (req, res, next) => {
-  const { name } = req.body ?? {};
+  const { name, whatsappPhone } = req.body ?? {};
 
   if (typeof name !== "string" || !name.trim()) {
     return res.status(400).json({ error: "El nombre del barbero es obligatorio." });
+  }
+  const normalizedWhatsappPhone = normalizeWhatsappPhone(whatsappPhone);
+  if (normalizedWhatsappPhone === undefined) {
+    return res.status(400).json({ error: "El WhatsApp debe tener formato internacional, por ejemplo +573001234567." });
   }
 
   try {
     const barber = await prisma.barber.create({
       data: {
         name: name.trim(),
+        whatsappPhone: normalizedWhatsappPhone,
         organizationId: req.organization.id
       }
     });
@@ -201,7 +214,7 @@ adminRouter.post("/barberos", ...requireAdminSelfService, async (req, res, next)
 });
 
 adminRouter.patch("/barberos/:id", ...requireAdminSelfService, async (req, res, next) => {
-  const { name, active } = req.body ?? {};
+  const { name, whatsappPhone, active } = req.body ?? {};
   const data = {};
   if (name !== undefined) {
     if (typeof name !== "string" || !name.trim()) {
@@ -209,13 +222,20 @@ adminRouter.patch("/barberos/:id", ...requireAdminSelfService, async (req, res, 
     }
     data.name = name.trim();
   }
+  if (whatsappPhone !== undefined) {
+    const normalizedWhatsappPhone = normalizeWhatsappPhone(whatsappPhone);
+    if (normalizedWhatsappPhone === undefined) {
+      return res.status(400).json({ error: "El WhatsApp debe tener formato internacional, por ejemplo +573001234567." });
+    }
+    data.whatsappPhone = normalizedWhatsappPhone;
+  }
   if (active !== undefined) data.active = Boolean(active);
 
   try {
     const barber = await prisma.barber.update({
       where: { id: req.params.id, organizationId: req.organization.id },
       data,
-      select: { id: true, name: true, active: true, updatedAt: true }
+      select: { id: true, name: true, whatsappPhone: true, active: true, updatedAt: true }
     });
     res.json(barber);
   } catch (error) {
@@ -271,7 +291,7 @@ adminRouter.post("/timeoff", ...requireAdminSelfService, async (req, res, next) 
     Number.isNaN(new Date(endsAt).getTime()) ||
     new Date(endsAt) <= new Date(startsAt)
   ) {
-    return res.status(400).json({ error: "Datos de bloqueo inválidos." });
+    return res.status(400).json({ error: "Datos de bloqueo invï¿½lidos." });
   }
 
   try {
