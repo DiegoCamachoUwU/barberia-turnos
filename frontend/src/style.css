@@ -80,6 +80,36 @@ button span { font-size: 17px; color: #e2a878; }
 .confirm-action { display: inline-flex; align-items: center; gap: 6px; padding: 10px 14px; color: #fff; background: var(--accent); border-radius: 4px; text-decoration: none; font-size: 12px; font-weight: 600; border: 0; cursor: pointer; }
 .confirm-action:hover { opacity: 0.9; }
 .confirmation-notice { margin: 16px 0; font-size: 12px; padding: 10px; border-radius: 4px; background: #faf8f4; border: 1px solid var(--line); }
+
+/* Onboarding */
+.onboarding .hint { color: var(--muted); font-size: 11px; margin-top: 4px; display: block; }
+.onboarding.success { text-align: center; }
+.onboarding-details { margin: 20px 0; padding: 16px; background: #faf8f4; border: 1px solid var(--line); border-radius: 4px; }
+.onboarding-details p { margin: 6px 0; font-size: 13px; }
+.onboarding-details strong { color: #6f695f; }
+
+/* Landing */
+.landing .shop-list { list-style: none; padding: 0; margin: 20px 0 0; display: grid; gap: 12px; }
+.landing .shop-list li { display: flex; align-items: center; justify-content: space-between; padding: 14px; background: #faf8f4; border: 1px solid var(--line); border-radius: 4px; }
+.landing .shop-list li.active { border-color: var(--accent); background: #fffdfa; }
+.landing .shop-info { flex: 1; }
+.landing .shop-slug { display: block; color: var(--muted); font-size: 11px; margin-top: 2px; }
+.landing button { width: auto; padding: 8px 14px; }
+
+/* Admin panel */
+.admin { max-width: 900px; margin: 0 auto; }
+.admin-tabs { display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--line); }
+.admin-tabs button { background: transparent; border: 0; border-bottom: 2px solid transparent; padding: 8px 14px; color: var(--muted); cursor: pointer; font-weight: 600; font-size: 12px; }
+.admin-tabs button.active { color: var(--ink); border-bottom-color: var(--accent); }
+.admin-tabs button:hover { color: var(--ink); }
+.org-form, .svc-form, .barber-form, .timeoff-form { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; padding: 16px; background: #faf8f4; border: 1px solid var(--line); border-radius: 4px; }
+.org-form button, .svc-form button, .barber-form button, .timeoff-form button { grid-column: 1 / -1; width: auto; }
+.list-table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+.list-table th, .list-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.list-table th { color: var(--muted); font-weight: 600; font-size: 11px; }
+.list-table .actions { display: flex; gap: 6px; }
+.list-table .actions button { padding: 4px 8px; font-size: 11px; width: auto; }
+
 footer { text-align: center; padding: 38px 0; color: #aaa297; }
 
 @media (max-width: 760px) {

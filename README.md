@@ -96,6 +96,52 @@ Después del despliegue inicial, valida que todo funcione:
 
 La URL de Vercel debe coincidir exactamente con `CLIENT_ORIGIN`; si cambia el dominio de producción, actualiza esa variable en Render y redespliega.
 
+## Onboarding SaaS (Frente 3)
+
+El endpoint público `POST /api/v1/saas/onboarding` permite registrar una nueva barbería de forma autónoma (self-service). En una transacción atómica crea:
+
+1. La `Organization` (nombre, slug único, teléfono, dirección, zona horaria).
+2. El primer usuario `ADMIN` de la barbería (email, contraseña hasheada con bcrypt).
+3. Un barbero por defecto ("Barbero principal") con su jornada laboral (lunes a sábado, 09:00–18:00).
+4. Un catálogo inicial de servicios (Corte, Barba).
+
+**Ejemplo de petición:**
+
+```json
+POST /api/v1/saas/onboarding
+{
+  "name": "Barbería Centro",
+  "slug": "barberia-centro",
+  "phone": "3001234567",
+  "address": "Cra 10 # 20-30",
+  "timezone": "America/Bogota",
+  "adminEmail": "admin@barberia-centro.com",
+  "adminPassword": "mi-contrasena-segura-123",
+  "adminPhone": "3009876543"
+}
+```
+
+El slug debe usar solo letras minúsculas, números y guiones, y no puede coincidir con rutas reservadas (`auth`, `barberos`, `health`, `servicios`, `turnos`, `saas`, `onboarding`).
+
+### Listado de organizaciones (solo SUPERADMIN)
+
+`GET /api/v1/saas/organizations` requiere un JWT con rol `SUPERADMIN` y devuelve todas las organizaciones registradas con sus conteos de usuarios y turnos.
+
+## Administración self-service del negocio
+
+Desde el panel de administración (protegido por JWT de rol `ADMIN` del mismo negocio), el administrador de cada barbería puede gestionar:
+
+| Módulo | Rutas | Acciones |
+|--------|-------|----------|
+| Negocio | `PATCH /:slug/admin/organization` | Actualizar nombre, teléfono, dirección, zona horaria |
+| Servicios | `GET/POST/PATCH/DELETE /:slug/admin/servicios` | CRUD de catálogo (nombre, descripción, duración, precio, activo/inactivo) |
+| Equipo | `GET/POST/PATCH/DELETE /:slug/admin/barberos` | CRUD de barberos (nombre, activo/inactivo, jornada por defecto) |
+| Bloqueos | `GET/POST/DELETE /:slug/admin/timeoff` | CRUD de bloqueos de tiempo (almuerzos, permisos, festivos) |
+
+## Portal de selección de barberías
+
+La vista de landing (`/`) permite buscar y seleccionar entre las barberías registradas. Al elegir una, se redirige a `/:slug` para operar en el contexto de ese negocio.
+
 ## API REST
 
 La API se sirve bajo `/api/v1`. Para operar una barbería se prefijan las rutas públicas y administrativas con `/<slug>`:

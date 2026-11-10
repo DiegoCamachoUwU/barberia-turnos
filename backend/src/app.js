@@ -5,6 +5,8 @@ import { prisma } from "./config/database.js";
 import { appointmentsRouter } from "./routes/appointments.js";
 import { catalogRouter } from "./routes/catalog.js";
 import { authRouter } from "./routes/auth.js";
+import { saasRouter } from "./routes/saas.js";
+import { adminRouter } from "./routes/admin.js";
 import {
   defaultOrganizationMiddleware,
   organizationMiddleware
@@ -19,6 +21,8 @@ app.use(express.json());
 
 app.get("/api/v1/health", (_req, res) => res.json({ status: "ok" }));
 
+app.use("/api/v1/saas", saasRouter);
+
 const legacyRouter = express.Router();
 legacyRouter.use(catalogRouter);
 legacyRouter.use("/turnos", appointmentsRouter);
@@ -32,6 +36,7 @@ app.use("/api/v1", (req, res, next) => {
 
 const tenantRouter = express.Router();
 tenantRouter.use(catalogRouter);
+tenantRouter.use("/admin", adminRouter);
 tenantRouter.use("/turnos", appointmentsRouter);
 tenantRouter.use("/auth", authRouter);
 app.use("/api/v1/:slug", organizationMiddleware, tenantRouter);

@@ -10,15 +10,22 @@ import {
   getServices,
   loginAdmin,
   updateAppointmentStatus,
-  getCurrentShopSlug
+  getCurrentShopSlug,
+  registerBarbershop
 } from "./services/api";
+import Onboarding from "./views/Onboarding";
+import AdminPanel from "./views/AdminPanel";
+import Landing from "./views/Landing";
 import type {
   Appointment,
   AppointmentConfirmation,
   AvailableSlot,
   Barber,
-  Service
+  Service,
+  Organization
 } from "./types";
+
+type AppView = "landing" | "booking" | "onboarding" | "admin";
 
 function localDateTimeValue(date: Date) {
   const offset = date.getTimezoneOffset() * 60_000;
@@ -28,6 +35,7 @@ function localDateTimeValue(date: Date) {
 const today = localDateTimeValue(new Date()).slice(0, 10);
 
 function App() {
+  const [view, setView] = useState<AppView>("landing");
   const [services, setServices] = useState<Service[]>([]);
   const [barbers, setBarbers] = useState<Barber[]>([]);
   const [shopName, setShopName] = useState("");
@@ -46,6 +54,8 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [clientEmail, setClientEmail] = useState("");
   const [confirmation, setConfirmation] = useState<AppointmentConfirmation | null>(null);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [orgsLoading, setOrgsLoading] = useState(false);
 
   async function loadData(selectedDate = date, token = adminToken) {
     setLoading(true);
@@ -66,6 +76,37 @@ function App() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function loadOrgs() {
+    setOrgsLoading(true);
+    try {
+      const token = localStorage.getItem("saas_token");
+      if (!token) return;
+      const resp = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000/api/v1"}/saas/organizations`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        setOrganizations(data);
+      }
+    } catch {
+      // Ignorar errores de lista de organizaciones
+    } finally {
+      setOrgsLoading(false);
+    }
+  }
+
+  function handleViewChange(next: AppView) {
+    setView(next);
+    setMessage("");
+    setConfirmation(null);
+  }
+
+  async function handleOnboardingComplete(slug: string) {
+    setView("booking");
+    // Forzar recarga del slug actual en el contexto de la tienda
+    window.location.pathname = `/${slug}`;
   }
 
   useEffect(() => {
@@ -179,12 +220,40 @@ function App() {
     setMessage("");
   }
 
+  const currentSlug = getCurrentShopSlug();
+
   return (
     <main className="shell">
-      <header className="topbar">
-        <a className="brand" href={`/${getCurrentShopSlug()}`}>{shopName || getCurrentShopSlug()}<span>.</span></a>
-        <span className="tagline">BARBERÍA · TURNOS ONLINE</span>
-      </header>
+      {view === "landing" ? (
+        <>
+          <header className="topbar">
+            <a className="brand" href="/">Barbería Turnos<span>.</span></a>
+            <span className="tagline">PLATAFORMA DE TURNOS ONLINE</span>
+          </header>
+          <Landing shops={organizations} onSelect={(slug) => { setView("booking"); window.location.pathname = `/${slug}`; }} />
+        </>
+      ) : view === "onboarding" ? (
+        <>
+          <header className="topbar">
+            <a className="brand" href="/" onClick={() => handleViewChange("landing")}>Barbería Turnos<span>.</span></a>
+            <span className="tagline">ONBOARDING SAAS</span>
+          </header>
+          <Onboarding onComplete={handleOnboardingComplete} />
+        </>
+      ) : view === "admin" ? (
+        <>
+          <header className="topbar">
+            <a className="brand" href="/" onClick={() => handleViewChange("landing")}>Barbería Turnos<span>.</span></a>
+            <span className="tagline">PANEL DE ADMINISTRACIÓN</span>
+          </header>
+          <AdminPanel slug={currentSlug} token={adminToken} />
+        </>
+      ) : (
+        <>
+          <header className="topbar">
+            <a className="brand" href={`/${currentSlug}`}>{shopName || currentSlug}<span>.</span></a>
+            <span className="tagline">BARBERÍA · TURNOS ONLINE</span>
+          </header>
 
       <section className="hero">
         <div>
@@ -365,6 +434,7 @@ function App() {
             </ul>
           )}
         </section>
+        </>
       )}
       <footer>BUEN CORTE. BUEN DÍA.</footer>
     </main>

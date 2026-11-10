@@ -18,12 +18,15 @@ enum AppointmentStatus {
 enum StaffRole {
   ADMIN
   BARBER
+  SUPERADMIN
 }
 
 model Organization {
   id           String        @id @default(cuid())
   name         String
   slug         String        @unique
+  phone        String?
+  address      String?
   active       Boolean       @default(true)
   timezone     String        @default("America/Bogota")
   services     Service[]

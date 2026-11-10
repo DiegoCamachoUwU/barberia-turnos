@@ -57,3 +57,69 @@ export interface AppointmentConfirmation extends Omit<Appointment, "clientEmail"
   calendar: CalendarLinks;
   notification: NotificationResult;
 }
+
+export interface Organization {
+  id: string;
+  name: string;
+  slug: string;
+  phone: string | null;
+  address: string | null;
+  timezone: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ServiceAdmin {
+  id: string;
+  name: string;
+  description: string | null;
+  durationMins: number;
+  priceCents: number;
+  active: boolean;
+  organizationId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BarberAdmin {
+  id: string;
+  name: string;
+  active: boolean;
+  organizationId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TimeOffAdmin {
+  id: string;
+  barberId: string;
+  startsAt: string;
+  endsAt: string;
+  reason: string | null;
+  barber: { id: string; name: string };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OnboardingResult {
+  message: string;
+  organization: {
+    id: string;
+    name: string;
+    slug: string;
+    phone: string | null;
+    address: string | null;
+    timezone: string;
+  };
+  adminUser: {
+    id: string;
+    email: string;
+    role: string;
+    organizationId: string;
+  };
+  defaultBarber: {
+    id: string;
+    name: string;
+  };
+}

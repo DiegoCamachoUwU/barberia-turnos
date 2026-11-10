@@ -3,10 +3,14 @@ import type {
   AppointmentConfirmation,
   Availability,
   Barber,
+  BarberAdmin,
   CalendarLinks,
   NotificationResult,
+  Organization,
+  OnboardingResult,
   Service,
-  Shop
+  ServiceAdmin,
+  TimeOffAdmin
 } from "../types";
 
 const defaultApiUrl = import.meta.env.PROD
@@ -107,3 +111,119 @@ export const downloadAppointmentCalendar = (id: string): Promise<Blob> => {
     }
   );
 };
+// ---------- Onboarding / SaaS ----------
+
+export const registerBarbershop = (data: {
+  name: string;
+  slug: string;
+  phone?: string | null;
+  address?: string | null;
+  timezone?: string;
+  adminEmail: string;
+  adminPassword: string;
+  adminPhone?: string | null;
+}) =>
+  request<OnboardingResult>("/saas/onboarding", {
+    method: "POST",
+    body: JSON.stringify(data)
+  });
+
+// ---------- Administración self-service del negocio ----------
+
+export const updateOrganization = (slug: string, data: {
+  name?: string;
+  phone?: string | null;
+  address?: string | null;
+  timezone?: string;
+}) =>
+  request<Organization>(`/${encodeURIComponent(slug)}/admin/organization`, {
+    method: "PATCH",
+    body: JSON.stringify(data)
+  });
+
+export const getServicesAdmin = (slug: string, token: string) =>
+  request<ServiceAdmin[]>(`/${encodeURIComponent(slug)}/admin/servicios`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+export const createService = (slug: string, token: string, data: {
+  name: string;
+  description?: string | null;
+  durationMins: number;
+  priceCents: number;
+}) =>
+  request<ServiceAdmin>(`/${encodeURIComponent(slug)}/admin/servicios`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(data)
+  });
+
+export const updateService = (slug: string, token: string, id: string, data: {
+  name?: string;
+  description?: string | null;
+  durationMins?: number;
+  priceCents?: number;
+  active?: boolean;
+}) =>
+  request<ServiceAdmin>(`/${encodeURIComponent(slug)}/admin/servicios/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(data)
+  });
+
+export const deleteService = (slug: string, token: string, id: string) =>
+  request<{ message: string }>(`/${encodeURIComponent(slug)}/admin/servicios/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+export const getBarbersAdmin = (slug: string, token: string) =>
+  request<BarberAdmin[]>(`/${encodeURIComponent(slug)}/admin/barberos`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+export const createBarber = (slug: string, token: string, data: { name: string }) =>
+  request<BarberAdmin>(`/${encodeURIComponent(slug)}/admin/barberos`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(data)
+  });
+
+export const updateBarber = (slug: string, token: string, id: string, data: {
+  name?: string;
+  active?: boolean;
+}) =>
+  request<BarberAdmin>(`/${encodeURIComponent(slug)}/admin/barberos/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(data)
+  });
+
+export const deleteBarber = (slug: string, token: string, id: string) =>
+  request<{ message: string }>(`/${encodeURIComponent(slug)}/admin/barberos/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+export const getTimeOffs = (slug: string, token: string) =>
+  request<TimeOffAdmin[]>(`/${encodeURIComponent(slug)}/admin/timeoff`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+export const createTimeOff = (slug: string, token: string, data: {
+  barberId: string;
+  startsAt: string;
+  endsAt: string;
+  reason?: string | null;
+}) =>
+  request<TimeOffAdmin>(`/${encodeURIComponent(slug)}/admin/timeoff`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(data)
+  });
+
+export const deleteTimeOff = (slug: string, token: string, id: string) =>
+  request<{ message: string }>(`/${encodeURIComponent(slug)}/admin/timeoff/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` }
+  });
