@@ -1,5 +1,13 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { createAppointment, getAppointments, getBarbers, getServices } from "./services/api";
+import {
+  createAppointment,
+  getAdminAppointments,
+  getAppointments,
+  getBarbers,
+  getServices,
+  loginAdmin,
+  updateAppointmentStatus
+} from "./services/api";
 import type { Appointment, Barber, Service } from "./types";
 
 function localDateTimeValue(date: Date) {
@@ -13,17 +21,18 @@ function App() {
   const [services, setServices] = useState<Service[]>([]);
   const [barbers, setBarbers] = useState<Barber[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [adminToken, setAdminToken] = useState("");
   const [date, setDate] = useState(today);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
 
-  async function loadData(selectedDate = date) {
+  async function loadData(selectedDate = date, token = adminToken) {
     setLoading(true);
     try {
       const [serviceList, barberList, appointmentList] = await Promise.all([
         getServices(),
         getBarbers(),
-        getAppointments(selectedDate)
+        token ? getAdminAppointments(selectedDate, token) : getAppointments(selectedDate)
       ]);
       setServices(serviceList);
       setBarbers(barberList);
@@ -38,7 +47,45 @@ function App() {
 
   useEffect(() => {
     void loadData();
-  }, [date]);
+  }, [date, adminToken]);
+
+  async function handleAdminLogin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const username = String(formData.get("username")).trim();
+    const password = String(formData.get("password"));
+    setMessage("");
+    setLoading(true);
+    try {
+      const session = await loginAdmin(username, password);
+      const adminAppointments = await getAdminAppointments(date, session.token);
+      setAppointments(adminAppointments);
+      setAdminToken(session.token);
+      setMessage("");
+      form.reset();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "No se pudo validar el acceso administrativo.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleAdminLogout() {
+    setAdminToken("");
+    setMessage("");
+  }
+
+  async function handleStatusChange(id: string, status: Appointment["status"]) {
+    setMessage("");
+    try {
+      await updateAppointmentStatus(id, status, adminToken);
+      await loadData(date, adminToken);
+      setMessage("Estado del turno actualizado.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "No se pudo actualizar el estado del turno.");
+    }
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -105,6 +152,19 @@ function App() {
             <div><h2>Agenda del día</h2><p>Consulta los turnos reservados.</p></div>
           </div>
           <label>Selecciona una fecha<input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label>
+          {adminToken ? (
+            <div className="admin-access">
+              <span className="admin-label">Vista administrativa activa</span>
+              <button className="admin-logout" type="button" onClick={handleAdminLogout}>Cerrar sesión administrativa</button>
+            </div>
+          ) : (
+            <form className="admin-access" onSubmit={handleAdminLogin}>
+              <span className="admin-label">Acceso administrativo</span>
+              <label>Usuario<input name="username" required autoComplete="username" placeholder="Usuario administrador" /></label>
+              <label>Contraseña<input name="password" type="password" required autoComplete="current-password" placeholder="Contraseña" /></label>
+              <button className="admin-login" type="submit">Ingresar al modo admin</button>
+            </form>
+          )}
           {loading ? <p className="empty">Cargando agenda…</p> : appointments.length === 0 ? (
             <p className="empty">Aún no hay turnos para esta fecha.</p>
           ) : (
@@ -112,8 +172,28 @@ function App() {
               {appointments.map((appointment) => (
                 <li key={appointment.id}>
                   <time>{new Date(appointment.startsAt).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" })}</time>
-                  <div><strong>Turno reservado</strong><span>{appointment.service.name} · {appointment.barber.name}</span></div>
+                  <div>
+                    <strong>{appointment.clientName || "Turno reservado"}</strong>
+                    {appointment.clientPhone && <span>{appointment.clientPhone}</span>}
+                    <span>{appointment.service.name} · {appointment.barber.name}</span>
+                  </div>
                   <span className={`status ${appointment.status.toLowerCase()}`}>{appointment.status === "PENDING" ? "Pendiente" : appointment.status === "CONFIRMED" ? "Confirmado" : appointment.status === "COMPLETED" ? "Completado" : "Cancelado"}</span>
+                  {adminToken && (
+                    <div className="appointment-actions">
+                      {appointment.status === "PENDING" && (
+                        <>
+                          <button type="button" onClick={() => void handleStatusChange(appointment.id, "CONFIRMED")}>Confirmar</button>
+                          <button type="button" onClick={() => void handleStatusChange(appointment.id, "CANCELLED")}>Cancelar</button>
+                        </>
+                      )}
+                      {appointment.status === "CONFIRMED" && (
+                        <>
+                          <button type="button" onClick={() => void handleStatusChange(appointment.id, "COMPLETED")}>Completar</button>
+                          <button type="button" onClick={() => void handleStatusChange(appointment.id, "CANCELLED")}>Cancelar</button>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>

@@ -4,39 +4,74 @@ import { prisma } from "../config/database.js";
 import { createAdminAuth } from "../middleware/adminAuth.js";
 
 export const appointmentsRouter = Router();
-const requireAdmin = createAdminAuth(() => process.env.ADMIN_API_TOKEN);
+const requireAdmin = createAdminAuth();
 
 const appointmentInclude = {
   barber: { select: { id: true, name: true } },
   service: { select: { id: true, name: true, durationMins: true, priceCents: true } }
 };
 
-appointmentsRouter.get("/", async (req, res, next) => {
-  try {
-    const where = {};
-    if (req.query.date) {
-      const dateString = String(req.query.date);
-      const timezoneOffset = Number(req.query.timezoneOffset ?? 0);
-      if (
-        !/^\d{4}-\d{2}-\d{2}$/.test(dateString) ||
-        !Number.isInteger(timezoneOffset) ||
-        Math.abs(timezoneOffset) > 840
-      ) {
-        return res.status(400).json({ error: "La fecha debe tener el formato YYYY-MM-DD." });
-      }
-      const date = new Date(`${dateString}T00:00:00.000Z`);
-      if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== dateString) {
-        return res.status(400).json({ error: "La fecha debe tener el formato YYYY-MM-DD." });
-      }
-      date.setUTCMinutes(date.getUTCMinutes() + timezoneOffset);
-      const nextDay = new Date(date);
-      nextDay.setUTCDate(nextDay.getUTCDate() + 1);
-      where.startsAt = { gte: date, lt: nextDay };
-    }
+function getDateFilter(req, res) {
+  if (!req.query.date) return {};
 
+  const dateString = String(req.query.date);
+  const timezoneOffset = Number(req.query.timezoneOffset ?? 0);
+  if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(dateString) ||
+    !Number.isInteger(timezoneOffset) ||
+    Math.abs(timezoneOffset) > 840
+  ) {
+    res.status(400).json({ error: "La fecha debe tener el formato YYYY-MM-DD." });
+    return null;
+  }
+
+  const date = new Date(`${dateString}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== dateString) {
+    res.status(400).json({ error: "La fecha debe tener el formato YYYY-MM-DD." });
+    return null;
+  }
+  date.setUTCMinutes(date.getUTCMinutes() + timezoneOffset);
+  const nextDay = new Date(date);
+  nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+  return { startsAt: { gte: date, lt: nextDay } };
+}
+
+appointmentsRouter.get("/admin", requireAdmin, async (req, res, next) => {
+  const dateFilter = getDateFilter(req, res);
+  if (!dateFilter) return;
+
+  try {
     const appointments = await prisma.appointment.findMany({
       where: {
-        ...where,
+        ...dateFilter,
+        status: { in: [AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED] }
+      },
+      select: {
+        id: true,
+        clientName: true,
+        clientPhone: true,
+        startsAt: true,
+        status: true,
+        barber: { select: { id: true, name: true } },
+        service: { select: { id: true, name: true, durationMins: true, priceCents: true } }
+      },
+      orderBy: { startsAt: "asc" }
+    });
+    res.set("Cache-Control", "no-store");
+    res.json(appointments);
+  } catch (error) {
+    next(error);
+  }
+});
+
+appointmentsRouter.get("/", async (req, res, next) => {
+  const dateFilter = getDateFilter(req, res);
+  if (!dateFilter) return;
+
+  try {
+    const appointments = await prisma.appointment.findMany({
+      where: {
+        ...dateFilter,
         status: { in: [AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED] }
       },
       select: {

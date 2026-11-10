@@ -4,18 +4,21 @@ import cors from "cors";
 import { prisma } from "./config/database.js";
 import { appointmentsRouter } from "./routes/appointments.js";
 import { catalogRouter } from "./routes/catalog.js";
+import { adminRouter } from "./routes/admin.js";
 
 const app = express();
 const port = Number(process.env.PORT) || 3000;
-const adminToken = process.env.ADMIN_API_TOKEN?.trim();
-if (adminToken && Buffer.byteLength(adminToken, "utf8") < 32) {
-  throw new Error("ADMIN_API_TOKEN debe tener al menos 32 bytes.");
+const adminSessionSecret = process.env.ADMIN_SESSION_SECRET;
+if (adminSessionSecret && Buffer.byteLength(adminSessionSecret, "utf8") < 32) {
+  throw new Error("ADMIN_SESSION_SECRET debe tener al menos 32 bytes.");
 }
 
 app.use(cors({ origin: process.env.CLIENT_ORIGIN || "http://localhost:5173" }));
+app.set("trust proxy", 1);
 app.use(express.json());
 
 app.get("/api/v1/health", (_req, res) => res.json({ status: "ok" }));
+app.use("/api/v1/admin", adminRouter);
 app.use("/api/v1", catalogRouter);
 app.use("/api/v1/turnos", appointmentsRouter);
 app.use((error, _req, res, _next) => {

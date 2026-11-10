@@ -15,7 +15,7 @@ Base full stack para reservar y consultar turnos. El frontend usa React, Vite y 
 4. Instala dependencias dentro de cada carpeta con `npm install`.
 5. Desde `backend`, ejecuta `npm run db:generate`, `npm run db:migrate` y `npm run db:seed`.
 6. Inicia la API con `npm run dev` y el frontend con `npm run dev` desde sus respectivas carpetas.
-7. Para habilitar cambios administrativos, configura `ADMIN_API_TOKEN` en el entorno del backend con un secreto aleatorio de al menos 32 bytes. Puedes generarlo con `node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"`. No lo pongas en el frontend ni lo envíes en la URL.
+7. Configura `ADMIN_USERNAME` y una contraseña fuerte `ADMIN_PASSWORD` en el entorno del backend. Genera `ADMIN_SESSION_SECRET` con `node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"`. No pongas esos secretos en el frontend, el repositorio ni los envíes en la URL.
 
 ## Despliegue gratuito en Render + Supabase + Vercel
 
@@ -35,11 +35,11 @@ Se requiere una cuenta en GitHub, Render, Supabase y Vercel. Sube este proyecto 
 ### API Express gratuita en Render
 
 1. En Render, crea un **Blueprint** desde el mismo repositorio. El [render.yaml](./render.yaml) configura el servicio Express con plan Free; no crea una base Render de pago ni una base Render Free que expire a los 30 días.
-2. Cuando Render solicite `DATABASE_URL`, pega la conexión Session pooler de Supabase. Cuando solicite `CLIENT_ORIGIN`, introduce el dominio de producción de Vercel, sin barra al final. Render genera `ADMIN_API_TOKEN` y ejecuta la migración inicial y la carga del catálogo al iniciar.
+2. Cuando Render solicite `DATABASE_URL`, pega la conexión Session pooler de Supabase. Cuando solicite `CLIENT_ORIGIN`, introduce el dominio de producción de Vercel, sin barra al final. Define un usuario y contraseña de administrador fuertes; Render genera `ADMIN_SESSION_SECRET`. Render ejecuta la migración inicial y la carga del catálogo al iniciar.
 3. Cuando termine el despliegue, comprueba `https://<URL-DE-LA-API>/api/v1/health`.
-4. En Vercel, configura `VITE_API_URL` en Production con `https://<URL-DE-LA-API>/api/v1` y vuelve a desplegar.
+4. En Vercel, configura el proyecto con el repositorio y la carpeta de frontend correctos (`frontend`). Configura `VITE_API_URL` en Production con `https://barberia-turnos-api.onrender.com/api/v1` y vuelve a desplegar. El frontend también usa esta URL de Render como valor predeterminado en compilaciones de producción.
 5. Prueba cargar servicios y reservar un turno. El endpoint de agenda devuelve horarios ocupados sin nombres ni teléfonos.
-6. Si necesitas cambiar estados administrativamente, copia `ADMIN_API_TOKEN` desde Render a un gestor de secretos. No lo configures en Vercel ni lo compartas con el navegador; el frontend público no implementa esas funciones.
+6. Para administrar turnos, inicia sesión desde **Agenda del día** con el usuario y contraseña configurados en Render. El servidor entrega una sesión firmada que vence en 8 horas; el frontend solo la mantiene en memoria. Limita los intentos de inicio de sesión automáticamente.
 
 La URL de Vercel debe coincidir exactamente con `CLIENT_ORIGIN`; si cambia el dominio de producción, actualiza esa variable en Render y redespliega. El endpoint de salud no requiere acceso a la base de datos. Para cambios de esquema futuros, crea una migración con `npm run db:migrate` en desarrollo y sube el directorio `backend/prisma/migrations` al repositorio; Render ejecutará `npm run db:migrate:deploy` al desplegar.
 
@@ -52,7 +52,9 @@ La API se sirve bajo `/api/v1`:
 | GET | `/health` | Estado de la API |
 | GET | `/servicios` | Servicios activos |
 | GET | `/barberos` | Barberos activos |
-| GET | `/turnos?date=YYYY-MM-DD&timezoneOffset=300` | Horarios ocupados del día local; no devuelve nombres ni teléfonos |
+| GET | `/turnos?date=YYYY-MM-DD&timezoneOffset=300` | Agenda pública del día; no devuelve nombres ni teléfonos |
+| POST | `/admin/login` | Valida usuario y contraseña, devuelve sesión administrativa temporal |
+| GET | `/turnos/admin?date=YYYY-MM-DD&timezoneOffset=300` | Agenda administrativa con nombre y teléfono; requiere sesión Bearer |
 | POST | `/turnos` | Reserva un turno y rechaza solapamientos del barbero |
 | PATCH | `/turnos/:id/estado` | Requiere `Authorization: Bearer <ADMIN_API_TOKEN>`; aplica transiciones válidas |
 
@@ -68,4 +70,4 @@ Ejemplo de reserva:
 }
 ```
 
-La API aplica CORS para `CLIENT_ORIGIN`. Sin `ADMIN_API_TOKEN`, los cambios administrativos responden con error y permanecen deshabilitados; una clave ausente no expone esta operación. Las transiciones permitidas son `PENDING` → `CONFIRMED` o `CANCELLED`, y `CONFIRMED` → `COMPLETED` o `CANCELLED`.
+La API aplica CORS para `CLIENT_ORIGIN`. En la sección Agenda del día, inicia sesión con las credenciales configuradas en Render para ver nombres y teléfonos y para confirmar, cancelar o completar turnos. La vista pública nunca devuelve datos personales. Las operaciones administrativas requieren sesión firmada de 8 horas, se limitan a cinco intentos de login por IP cada 15 minutos y fallan cerradas si faltan secretos. Las transiciones permitidas son `PENDING` → `CONFIRMED` o `CANCELLED`, y `CONFIRMED` → `COMPLETED` o `CANCELLED`.
