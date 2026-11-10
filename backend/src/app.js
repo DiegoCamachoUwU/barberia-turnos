@@ -4,23 +4,38 @@ import cors from "cors";
 import { prisma } from "./config/database.js";
 import { appointmentsRouter } from "./routes/appointments.js";
 import { catalogRouter } from "./routes/catalog.js";
-import { adminRouter } from "./routes/admin.js";
+import { authRouter } from "./routes/auth.js";
+import {
+  defaultOrganizationMiddleware,
+  organizationMiddleware
+} from "./middleware/organization.js";
 
 const app = express();
 const port = Number(process.env.PORT) || 3000;
-const adminSessionSecret = process.env.ADMIN_SESSION_SECRET;
-if (adminSessionSecret && Buffer.byteLength(adminSessionSecret, "utf8") < 32) {
-  throw new Error("ADMIN_SESSION_SECRET debe tener al menos 32 bytes.");
-}
 
 app.use(cors({ origin: process.env.CLIENT_ORIGIN || "http://localhost:5173" }));
 app.set("trust proxy", 1);
 app.use(express.json());
 
 app.get("/api/v1/health", (_req, res) => res.json({ status: "ok" }));
-app.use("/api/v1/admin", adminRouter);
-app.use("/api/v1", catalogRouter);
-app.use("/api/v1/turnos", appointmentsRouter);
+
+const legacyRouter = express.Router();
+legacyRouter.use(catalogRouter);
+legacyRouter.use("/turnos", appointmentsRouter);
+legacyRouter.use("/auth", authRouter);
+app.use("/api/v1", (req, res, next) => {
+  if (!/^\/(?:auth|barberos|servicios|turnos)(?:\/|$)/.test(req.path)) {
+    return next();
+  }
+  return defaultOrganizationMiddleware(req, res, next);
+}, legacyRouter);
+
+const tenantRouter = express.Router();
+tenantRouter.use(catalogRouter);
+tenantRouter.use("/turnos", appointmentsRouter);
+tenantRouter.use("/auth", authRouter);
+app.use("/api/v1/:slug", organizationMiddleware, tenantRouter);
+
 app.use((error, _req, res, _next) => {
   console.error(error);
   const status = error.status || (error.code === "P2025" ? 404 : error.code === "P2034" ? 409 : 500);

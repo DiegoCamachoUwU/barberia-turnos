@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 enum AppointmentStatus {
@@ -14,40 +15,134 @@ enum AppointmentStatus {
   CANCELLED
 }
 
-model Service {
+enum StaffRole {
+  ADMIN
+  BARBER
+}
+
+model Organization {
   id           String        @id @default(cuid())
-  name         String        @unique
-  description  String?
-  durationMins Int
-  priceCents   Int
+  name         String
+  slug         String        @unique
   active       Boolean       @default(true)
+  timezone     String        @default("America/Bogota")
+  services     Service[]
+  barbers      Barber[]
+  staffUsers   StaffUser[]
   appointments Appointment[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
+}
+
+model StaffUser {
+  id             String       @id @default(cuid())
+  email          String
+  passwordHash   String
+  role           StaffRole    @default(BARBER)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, email])
+  @@index([organizationId, role])
+}
+
+model Service {
+  id             String        @id @default(cuid())
+  name           String
+  description    String?
+  durationMins   Int
+  priceCents     Int
+  active         Boolean       @default(true)
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id])
+  appointments   Appointment[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@unique([organizationId, name])
+  @@unique([id, organizationId])
 }
 
 model Barber {
-  id           String        @id @default(cuid())
-  name         String
-  active       Boolean       @default(true)
-  appointments Appointment[]
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  id             String              @id @default(cuid())
+  name           String
+  active         Boolean             @default(true)
+  organizationId String
+  organization   Organization        @relation(fields: [organizationId], references: [id])
+  appointments   Appointment[]
+  workingHours   WorkingHours[]
+  exceptions     ScheduleException[]
+  timeOffs       TimeOff[]
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@unique([id, organizationId])
+  @@index([organizationId, active])
+}
+
+model WorkingHours {
+  id          String   @id @default(cuid())
+  barberId    String
+  dayOfWeek   Int
+  startMinute Int
+  endMinute   Int
+  barber      Barber   @relation(fields: [barberId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([barberId, dayOfWeek, startMinute])
+  @@index([barberId, dayOfWeek])
+}
+
+model ScheduleException {
+  id          String   @id @default(cuid())
+  barberId    String
+  date        DateTime @db.Date
+  isClosed    Boolean  @default(true)
+  startMinute Int?
+  endMinute   Int?
+  barber      Barber   @relation(fields: [barberId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([barberId, date])
+  @@index([date])
+}
+
+model TimeOff {
+  id        String   @id @default(cuid())
+  barberId  String
+  startsAt  DateTime
+  endsAt    DateTime
+  reason    String?
+  barber    Barber   @relation(fields: [barberId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([barberId, startsAt, endsAt])
 }
 
 model Appointment {
-  id        String            @id @default(cuid())
-  clientName String
-  clientPhone String
-  startsAt  DateTime
-  status    AppointmentStatus @default(PENDING)
-  barberId  String
-  serviceId String
-  barber    Barber            @relation(fields: [barberId], references: [id])
-  service   Service           @relation(fields: [serviceId], references: [id])
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
+  id             String            @id @default(cuid())
+  clientName     String
+  clientPhone    String
+  clientEmail    String?
+  startsAt       DateTime
+  endsAt         DateTime
+  status         AppointmentStatus @default(PENDING)
+  organizationId String
+  barberId       String
+  serviceId      String
+  organization   Organization      @relation(fields: [organizationId], references: [id])
+  barber         Barber            @relation(fields: [barberId, organizationId], references: [id, organizationId])
+  service        Service           @relation(fields: [serviceId, organizationId], references: [id, organizationId])
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
 
   @@index([barberId, startsAt])
+  @@index([barberId, endsAt])
   @@index([startsAt, status])
+  @@index([organizationId, startsAt])
 }

@@ -1,14 +1,24 @@
 import { useEffect, useState, type FormEvent } from "react";
 import {
   createAppointment,
+  downloadAppointmentCalendar,
   getAdminAppointments,
+  getAvailableSlots,
   getAppointments,
   getBarbers,
+  getShop,
   getServices,
   loginAdmin,
-  updateAppointmentStatus
+  updateAppointmentStatus,
+  getCurrentShopSlug
 } from "./services/api";
-import type { Appointment, Barber, Service } from "./types";
+import type {
+  Appointment,
+  AppointmentConfirmation,
+  AvailableSlot,
+  Barber,
+  Service
+} from "./types";
 
 function localDateTimeValue(date: Date) {
   const offset = date.getTimezoneOffset() * 60_000;
@@ -20,20 +30,33 @@ const today = localDateTimeValue(new Date()).slice(0, 10);
 function App() {
   const [services, setServices] = useState<Service[]>([]);
   const [barbers, setBarbers] = useState<Barber[]>([]);
+  const [shopName, setShopName] = useState("");
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [adminToken, setAdminToken] = useState("");
   const [date, setDate] = useState(today);
+  const [bookingDate, setBookingDate] = useState(today);
+  const [serviceId, setServiceId] = useState("");
+  const [barberId, setBarberId] = useState("");
+  const [availableSlots, setAvailableSlots] = useState<AvailableSlot[]>([]);
+  const [selectedSlot, setSelectedSlot] = useState("");
+  const [slotTimezone, setSlotTimezone] = useState("America/Bogota");
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [slotsError, setSlotsError] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
+  const [clientEmail, setClientEmail] = useState("");
+  const [confirmation, setConfirmation] = useState<AppointmentConfirmation | null>(null);
 
   async function loadData(selectedDate = date, token = adminToken) {
     setLoading(true);
     try {
-      const [serviceList, barberList, appointmentList] = await Promise.all([
+      const [shop, serviceList, barberList, appointmentList] = await Promise.all([
+        getShop(),
         getServices(),
         getBarbers(),
         token ? getAdminAppointments(selectedDate, token) : getAppointments(selectedDate)
       ]);
+      setShopName(shop.name);
       setServices(serviceList);
       setBarbers(barberList);
       setAppointments(appointmentList);
@@ -49,16 +72,47 @@ function App() {
     void loadData();
   }, [date, adminToken]);
 
+  useEffect(() => {
+    setAvailableSlots([]);
+    setSelectedSlot("");
+    setSlotsError("");
+    if (!barberId || !serviceId || !bookingDate) {
+      setSlotsLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setSlotsLoading(true);
+    getAvailableSlots(barberId, serviceId, bookingDate)
+      .then((availability) => {
+        if (cancelled) return;
+        setAvailableSlots(availability.slots);
+        setSlotTimezone(availability.timezone);
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setSlotsError(error instanceof Error ? error.message : "No se pudieron consultar los horarios.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setSlotsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [barberId, serviceId, bookingDate]);
+
   async function handleAdminLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
     const formData = new FormData(form);
-    const username = String(formData.get("username")).trim();
+    const email = String(formData.get("email")).trim();
     const password = String(formData.get("password"));
     setMessage("");
     setLoading(true);
     try {
-      const session = await loginAdmin(username, password);
+      const session = await loginAdmin(email, password);
       const adminAppointments = await getAdminAppointments(date, session.token);
       setAppointments(adminAppointments);
       setAdminToken(session.token);
@@ -90,29 +144,45 @@ function App() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage("");
+    setConfirmation(null);
+    if (!selectedSlot) {
+      setMessage("Selecciona uno de los horarios disponibles.");
+      return;
+    }
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
-    const startsAt = new Date(String(form.get("time"))).toISOString();
+    const email = String(form.get("clientEmail") || "").trim();
     try {
-      await createAppointment({
+      const result = await createAppointment({
         clientName: String(form.get("clientName")),
         clientPhone: String(form.get("clientPhone")),
-        serviceId: String(form.get("serviceId")),
-        barberId: String(form.get("barberId")),
-        startsAt
+        clientEmail: email || null,
+        serviceId,
+        barberId,
+        startsAt: selectedSlot
       });
       formElement.reset();
-      setMessage("Turno reservado correctamente.");
+      setClientEmail("");
       await loadData();
+      setServiceId("");
+      setBarberId("");
+      setBookingDate(today);
+      setSelectedSlot("");
+      setConfirmation(result);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "No se pudo reservar el turno.");
     }
   }
 
+  function handleNewBooking() {
+    setConfirmation(null);
+    setMessage("");
+  }
+
   return (
     <main className="shell">
       <header className="topbar">
-        <a className="brand" href="/">NAVAJA<span>.</span></a>
+        <a className="brand" href={`/${getCurrentShopSlug()}`}>{shopName || getCurrentShopSlug()}<span>.</span></a>
         <span className="tagline">BARBERÍA · TURNOS ONLINE</span>
       </header>
 
@@ -125,7 +195,71 @@ function App() {
         <div className="hero-mark" aria-hidden="true">✳</div>
       </section>
 
-      <section className="content-grid">
+      {confirmation ? (
+        <section className="panel confirmation">
+          <div className="section-heading">
+            <span className="step">03</span>
+            <div>
+              <h2>Turno reservado</h2>
+              <p>Tu cita quedó confirmada. Aquí tienes los detalles y el enlace para tu calendario.</p>
+            </div>
+          </div>
+          <div className="confirmation-details">
+            <p><strong>Cliente:</strong> {confirmation.clientName}</p>
+            <p><strong>Teléfono:</strong> {confirmation.clientPhone || "—"}</p>
+            {confirmation.clientEmail && <p><strong>Correo:</strong> {confirmation.clientEmail}</p>}
+            <p><strong>Servicio:</strong> {confirmation.service.name} · {confirmation.service.durationMins} min</p>
+            <p><strong>Barbero:</strong> {confirmation.barber.name}</p>
+            <p>
+              <strong>Fecha y hora:</strong>{" "}
+              {new Date(confirmation.startsAt).toLocaleString("es-CO", {
+                weekday: "long",
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+                hour: "2-digit",
+                minute: "2-digit"
+              })}
+            </p>
+            <p><strong>Estado:</strong> {confirmation.status}</p>
+          </div>
+          <div className="confirmation-actions">
+            <button
+              type="button"
+              onClick={() =>
+                void downloadAppointmentCalendar(confirmation.id).then((blob) => {
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `cita-${confirmation.id}.ics`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                })
+              }
+            >
+              Descargar .ics
+            </button>
+            <a
+              href={confirmation.calendar.googleCalendar}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="confirm-action"
+            >
+              Agregar a Google Calendar
+            </a>
+          </div>
+          <p className="confirmation-notice" role="status">
+            Notificación:{" "}
+            {confirmation.notification.sent
+              ? `Enviada por ${confirmation.notification.channel}.`
+              : `No se pudo enviar (${confirmation.notification.error || "canal no configurado"}).`}
+          </p>
+          <button type="button" onClick={handleNewBooking}>
+            Reservar otro turno
+          </button>
+        </section>
+      ) : (
+        <section className="content-grid">
         <form className="panel booking" onSubmit={handleSubmit}>
           <div className="section-heading">
             <span className="step">01</span>
@@ -133,16 +267,48 @@ function App() {
           </div>
           <label>Tu nombre<input name="clientName" required autoComplete="name" placeholder="Ej. Diego Pérez" /></label>
           <label>Teléfono<input name="clientPhone" required autoComplete="tel" placeholder="Ej. 300 123 4567" /></label>
+          <label>Correo electrónico (opcional)<input name="clientEmail" type="email" autoComplete="email" placeholder="ejemplo@correo.com" value={clientEmail} onChange={(event) => setClientEmail(event.target.value)} /></label>
           <div className="form-row">
-            <label>Servicio<select name="serviceId" required defaultValue=""><option value="" disabled>Selecciona</option>
-              {services.map((service) => <option key={service.id} value={service.id}>{service.name} · ${(service.priceCents / 100).toLocaleString("es-CO")}</option>)}
+            <label>Servicio<select name="serviceId" required value={serviceId} onChange={(event) => setServiceId(event.target.value)}><option value="" disabled>Selecciona</option>
+              {services.map((service) => <option key={service.id} value={service.id}>{service.name} · {service.durationMins} min · ${(service.priceCents / 100).toLocaleString("es-CO")}</option>)}
             </select></label>
-            <label>Barbero<select name="barberId" required defaultValue=""><option value="" disabled>Selecciona</option>
+            <label>Barbero<select name="barberId" required value={barberId} onChange={(event) => setBarberId(event.target.value)}><option value="" disabled>Selecciona</option>
               {barbers.map((barber) => <option key={barber.id} value={barber.id}>{barber.name}</option>)}
             </select></label>
           </div>
-          <label>Fecha y hora<input name="time" type="datetime-local" required min={localDateTimeValue(new Date())} /></label>
-          <button type="submit">Confirmar reserva <span>↗</span></button>
+          <label>Fecha<input name="date" type="date" required min={today} value={bookingDate} onChange={(event) => setBookingDate(event.target.value)} /></label>
+          <div className="slot-picker" aria-live="polite">
+            <span className="slot-label">Horarios disponibles</span>
+            {!serviceId || !barberId ? (
+              <p className="slot-hint">Selecciona un servicio y un barbero para consultar los horarios.</p>
+            ) : slotsLoading ? (
+              <p className="slot-hint">Buscando horarios disponibles…</p>
+            ) : slotsError ? (
+              <p className="slot-error" role="alert">{slotsError}</p>
+            ) : availableSlots.length === 0 ? (
+              <p className="slot-hint">No hay horarios disponibles para esta fecha.</p>
+            ) : (
+              <div className="slot-list" role="group" aria-label="Horarios disponibles">
+                {availableSlots.map((slot) => (
+                  <button
+                    className={`slot-option${selectedSlot === slot.startsAt ? " selected" : ""}`}
+                    type="button"
+                    key={slot.startsAt}
+                    aria-pressed={selectedSlot === slot.startsAt}
+                    onClick={() => setSelectedSlot(slot.startsAt)}
+                  >
+                    {new Intl.DateTimeFormat("es-CO", {
+                      timeZone: slotTimezone,
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      hourCycle: "h23"
+                    }).format(new Date(slot.startsAt))}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <button type="submit" disabled={!selectedSlot || slotsLoading}>Confirmar reserva <span>↗</span></button>
           {message && <p className="message" role="status">{message}</p>}
         </form>
 
@@ -160,7 +326,7 @@ function App() {
           ) : (
             <form className="admin-access" onSubmit={handleAdminLogin}>
               <span className="admin-label">Acceso administrativo</span>
-              <label>Usuario<input name="username" required autoComplete="username" placeholder="Usuario administrador" /></label>
+              <label>Correo<input name="email" type="email" required autoComplete="username" placeholder="admin@barberia.com" /></label>
               <label>Contraseña<input name="password" type="password" required autoComplete="current-password" placeholder="Contraseña" /></label>
               <button className="admin-login" type="submit">Ingresar al modo admin</button>
             </form>
@@ -199,7 +365,7 @@ function App() {
             </ul>
           )}
         </section>
-      </section>
+      )}
       <footer>BUEN CORTE. BUEN DÍA.</footer>
     </main>
   );
