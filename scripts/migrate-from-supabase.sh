@@ -1,30 +1,34 @@
 #!/usr/bin/env bash
 # migrate-from-supabase.sh — Migra datos desde Supabase al PostgreSQL en Docker.
-# Uso: bash migrate-from-supabase.sh <ARCHIVO_PG_DUMP> [--force]
+# Uso: bash migrate-from-supabase.sh <ARCHIVO_PG_DUMP> [--force] [--expected "tabla=valor,tabla=valor"]
 #
 # Seguridad:
 #   - Hace backup automático del destino antes de vaciar las tablas.
 #   - Valida que el dump no esté vacío y contenga al menos una tabla esperada.
 #   - Requiere confirmación explícita (o --force) para vaciar tablas.
+#   - Opcionalmente compara los conteos importados con los esperados.
 #   - Solo debe ejecutarse después de que el stack Docker esté activo.
 
 set -euo pipefail
 
 FORCE=false
 DUMP_FILE=""
+EXPECTED=""
 
 # Parsear argumentos
 while [ $# -gt 0 ]; do
   case "$1" in
     --force) FORCE=true ;;
+    --expected) EXPECTED="$2"; shift ;;
     *) DUMP_FILE="$1" ;;
   esac
   shift
 done
 
 if [ -z "$DUMP_FILE" ]; then
-  echo "Uso: bash $0 <ARCHIVO_PG_DUMP> [--force]"
+  echo "Uso: bash $0 <ARCHIVO_PG_DUMP> [--force] [--expected 'tabla=valor,tabla=valor']"
   echo "  --force: Salta la confirmación interactiva para vaciar tablas."
+  echo "  --expected: Compara conteos finales (ej. --expected 'organization=1,service=3')."
   exit 1
 fi
 
@@ -94,12 +98,33 @@ echo "==> 7. Reiniciando la API para recargar el esquema..."
 docker-compose -f "$COMPOSE_DIR/docker-compose.yml" restart api
 
 echo "==> 8. Verificando conteo de registros..."
-docker-compose -f "$COMPOSE_DIR/docker-compose.yml" exec db psql \
-  -U "$DB_USER" -d "$DB_NAME" \
-  -c "SELECT 'organization' AS tabla, count(*) FROM organization
-       UNION ALL SELECT 'service', count(*) FROM service
-       UNION ALL SELECT 'barber', count(*) FROM barber
-       UNION ALL SELECT 'appointment', count(*) FROM appointment
-       UNION ALL SELECT 'staff_user', count(*) FROM staff_user;"
+ACTUAL_COUNTS=$(docker-compose -f "$COMPOSE_DIR/docker-compose.yml" exec db psql \
+  -U "$DB_USER" -d "$DB_NAME" -t -A -c \
+  "SELECT 'organization=' || count(*) FROM organization
+    UNION ALL SELECT 'service=' || count(*) FROM service
+    UNION ALL SELECT 'barber=' || count(*) FROM barber
+    UNION ALL SELECT 'appointment=' || count(*) FROM appointment
+    UNION ALL SELECT 'staff_user=' || count(*) FROM staff_user;" | tr '\n' ',' | sed 's/,$//')
+echo "Conteos actuales: $ACTUAL_COUNTS"
+
+if [ -n "$EXPECTED" ]; then
+  echo "Conteos esperados: $EXPECTED"
+  MISMATCH=""
+  IFS=',' read -ra EXPECTED_PAIRS <<< "$EXPECTED"
+  for pair in "${EXPECTED_PAIRS[@]}"; do
+    tabla="${pair%%=*}"
+    valor="${pair##*=}"
+    actual=$(echo "$ACTUAL_COUNTS" | tr ',' '\n' | grep "^${tabla}=" | cut -d= -f2)
+    if [ "$actual" != "$valor" ]; then
+      MISMATCH="$MISMATCH $tabla(esperado=$valor, actual=$actual)"
+    fi
+  done
+  if [ -n "$MISMATCH" ]; then
+    echo "ERROR: Los conteos no coinciden:$MISMATCH"
+    echo "Verifica el dump y vuelve a intentarlo."
+    exit 1
+  fi
+  echo "Los conteos coinciden con los esperados."
+fi
 
 echo "==> ¡Migración completada!"

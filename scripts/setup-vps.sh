@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
 # setup-vps.sh — Instala Docker, Docker Compose, Nginx y Certbot en Ubuntu 24.04.
 # Uso: bash setup-vps.sh
-# Reemplaza DOMAIN y EMAIL antes de ejecutar.
+# Reemplaza DOMAIN y EMAIL pasándolos por entorno o editando las líneas al inicio.
 
 set -euo pipefail
 
-DOMAIN="api.tudominio.com"
-EMAIL="admin@tudominio.com"
+DOMAIN="${DOMAIN:-api.tudominio.com}"
+EMAIL="${EMAIL:-admin@tudominio.com}"
+
+if [ -z "$DOMAIN" ] || [ -z "$EMAIL" ]; then
+  echo "ERROR: Define DOMAIN y EMAIL (ej. export DOMAIN='api.tudominio.com' export EMAIL='admin@tudominio.com')."
+  exit 1
+fi
 
 echo "==> 1. Actualizando paquetes del sistema..."
 sudo apt update && sudo apt upgrade -y
