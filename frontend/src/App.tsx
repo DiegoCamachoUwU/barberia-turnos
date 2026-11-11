@@ -35,7 +35,7 @@ function localDateTimeValue(date: Date) {
 const today = localDateTimeValue(new Date()).slice(0, 10);
 
 function App() {
-  const [view, setView] = useState<AppView>("landing");
+  const [view, setView] = useState<AppView>("booking");
   const [services, setServices] = useState<Service[]>([]);
   const [barbers, setBarbers] = useState<Barber[]>([]);
   const [shopName, setShopName] = useState("");
