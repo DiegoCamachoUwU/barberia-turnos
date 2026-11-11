@@ -2,6 +2,30 @@
 
 Base full stack para reservar y consultar turnos. El frontend usa React, Vite y TypeScript; la API usa Express y Prisma con PostgreSQL.
 
+## Despliegue de la API en VPS con Docker
+
+En `backend` están el `Dockerfile` y `docker-compose.yml` para ejecutar Node.js 22 y PostgreSQL con el volumen persistente `postgres_data`. En el VPS instala Docker Engine y el plugin Docker Compose, clona el repositorio y ejecuta:
+
+```bash
+cd backend
+cp .env.example .env
+nano .env
+docker compose up -d --build
+docker compose logs -f api
+```
+
+Antes de iniciar, cambia `POSTGRES_PASSWORD`, `ADMIN_PASSWORD` y `JWT_SECRET` por valores únicos y fuertes. Mantén `DATABASE_URL` y `DIRECT_URL` apuntando al host `db` del Compose, con las mismas credenciales. Define `APP_BASE_URL` como `https://api.tudominio.com/api/v1`, `CLIENT_ORIGIN` como el origen HTTPS del frontend y configura `NOTIFICATION_CHANNEL` y las credenciales del proveedor solo si vas a enviar notificaciones. El archivo `.env` no debe subirse al repositorio. Compose aplica migraciones y ejecuta el seed al arrancar la API. La base queda persistida en `postgres_data`; configura además copias de seguridad externas periódicas.
+
+### Dominio, Nginx y HTTPS (Let's Encrypt)
+
+1. Crea registros DNS `A` para `api.tudominio.com` (y el dominio del frontend si también lo alojas allí) apuntando a la IP pública del VPS. Espera la propagación DNS.
+2. Permite tráfico entrante TCP 80 y 443 en el firewall del proveedor y del VPS. El Compose publica la API solo en `127.0.0.1:3000`, no directamente en Internet.
+3. Instala Nginx y configura un virtual host para `api.tudominio.com` que haga `proxy_pass http://127.0.0.1:3000;`, con los encabezados `Host`, `X-Real-IP`, `X-Forwarded-For` y `X-Forwarded-Proto`.
+4. Valida y recarga Nginx (`sudo nginx -t && sudo systemctl reload nginx`), instala Certbot con el plugin de Nginx según la distribución del VPS y ejecuta `sudo certbot --nginx -d api.tudominio.com`. Certbot obtiene el certificado gratuito de Let's Encrypt y configura HTTPS; valida la renovación automática con `sudo certbot renew --dry-run`.
+5. Verifica `https://api.tudominio.com/api/v1/health` y confirma que devuelve `{"status":"ok"}`.
+
+No habilites el acceso público al puerto 5432 de PostgreSQL. Protege SSH, actualiza el sistema y prueba la restauración de las copias de seguridad. Este Compose cubre API y base de datos; el frontend debe servirse aparte (por ejemplo, como archivos estáticos detrás de Nginx).
+
 ## Requisitos
 
 - Node.js 22.x
